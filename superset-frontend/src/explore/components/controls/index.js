@@ -17,11 +17,11 @@
  * under the License.
  */
 import { sharedControlComponents } from '@superset-ui/chart-controls';
+import { getExtensionsRegistry } from '@superset-ui/core';
 import AnnotationLayerControl from './AnnotationLayerControl';
 import BoundsControl from './BoundsControl';
 import CheckboxControl from './CheckboxControl';
 import CollectionControl from './CollectionControl';
-import ColorMapControl from './ColorMapControl';
 import ColorPickerControl from './ColorPickerControl';
 import ColorSchemeControl from './ColorSchemeControl';
 import DatasourceControl from './DatasourceControl';
@@ -35,34 +35,55 @@ import SpatialControl from './SpatialControl';
 import TextAreaControl from './TextAreaControl';
 import TextControl from './TextControl';
 import TimeSeriesColumnControl from './TimeSeriesColumnControl';
+import TimeOffsetControl from './TimeOffsetControl';
 import ViewportControl from './ViewportControl';
 import VizTypeControl from './VizTypeControl';
 import MetricsControl from './MetricControl/MetricsControl';
 import AdhocFilterControl from './FilterControl/AdhocFilterControl';
-import FilterBoxItemControl from './FilterBoxItemControl';
 import ConditionalFormattingControl from './ConditionalFormattingControl';
+import ContourControl from './ContourControl';
 import DndColumnSelectControl, {
   DndColumnSelect,
   DndFilterSelect,
   DndMetricSelect,
 } from './DndColumnSelectControl';
+import XAxisSortControl from './XAxisSortControl';
+import CurrencyControl from './CurrencyControl';
+import ColumnConfigControl from './ColumnConfigControl';
+import { ComparisonRangeLabel } from './ComparisonRangeLabel';
+import LayerConfigsControl from './LayerConfigsControl/LayerConfigsControl';
+import MapViewControl from './MapViewControl/MapViewControl';
+import ZoomConfigControl from './ZoomConfigControl/ZoomConfigControl';
+import NumberControl from './NumberControl';
+import TimeRangeControl from './TimeRangeControl';
+import ColorBreakpointsControl from './ColorBreakpointsControl';
+
+const extensionsRegistry = getExtensionsRegistry();
+const DateFilterControlExtension = extensionsRegistry.get(
+  'filter.dateFilterControl',
+);
+const DateFilterComponent = DateFilterControlExtension ?? DateFilterControl;
 
 const controlMap = {
   AnnotationLayerControl,
   BoundsControl,
   CheckboxControl,
   CollectionControl,
-  ColorMapControl,
   ColorPickerControl,
   ColorSchemeControl,
+  ColumnConfigControl,
+  CurrencyControl,
   DatasourceControl,
-  DateFilterControl,
+  DateFilterControl: DateFilterComponent,
   DndColumnSelectControl,
   DndColumnSelect,
   DndFilterSelect,
   DndMetricSelect,
   FixedOrMetricControl,
+  ColorBreakpointsControl,
   HiddenControl,
+  LayerConfigsControl,
+  MapViewControl,
   SelectAsyncControl,
   SelectControl,
   SliderControl,
@@ -74,8 +95,14 @@ const controlMap = {
   VizTypeControl,
   MetricsControl,
   AdhocFilterControl,
-  FilterBoxItemControl,
   ConditionalFormattingControl,
+  XAxisSortControl,
+  ContourControl,
+  ComparisonRangeLabel,
+  TimeOffsetControl,
+  ZoomConfigControl,
+  NumberControl,
+  TimeRangeControl,
   ...sharedControlComponents,
 };
 export default controlMap;

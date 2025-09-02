@@ -16,53 +16,49 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React, { useEffect, useState } from 'react';
-import { styled, t } from '@superset-ui/core';
-import SyntaxHighlighter from 'react-syntax-highlighter/dist/cjs/light';
-import github from 'react-syntax-highlighter/dist/cjs/styles/hljs/github';
-import CopyToClipboard from 'src/components/CopyToClipboard';
-import Loading from 'src/components/Loading';
-import { CopyButton } from 'src/explore/components/DataTableControl';
-import { getClientErrorObject } from 'src/utils/getClientErrorObject';
-import { getChartDataRequest } from 'src/chart/chartAction';
-import markdownSyntax from 'react-syntax-highlighter/dist/cjs/languages/hljs/markdown';
-import htmlSyntax from 'react-syntax-highlighter/dist/cjs/languages/hljs/htmlbars';
-import sqlSyntax from 'react-syntax-highlighter/dist/cjs/languages/hljs/sql';
-import jsonSyntax from 'react-syntax-highlighter/dist/cjs/languages/hljs/json';
+import { FC, useEffect, useState } from 'react';
 
-const CopyButtonViewQuery = styled(CopyButton)`
-  && {
-    margin: 0 0 ${({ theme }) => theme.gridUnit}px;
-  }
-`;
-
-SyntaxHighlighter.registerLanguage('markdown', markdownSyntax);
-SyntaxHighlighter.registerLanguage('html', htmlSyntax);
-SyntaxHighlighter.registerLanguage('sql', sqlSyntax);
-SyntaxHighlighter.registerLanguage('json', jsonSyntax);
+import {
+  styled,
+  ensureIsArray,
+  t,
+  getClientErrorObject,
+  QueryFormData,
+} from '@superset-ui/core';
+import { Loading } from '@superset-ui/core/components';
+import { getChartDataRequest } from 'src/components/Chart/chartAction';
+import ViewQuery from 'src/explore/components/controls/ViewQuery';
 
 interface Props {
-  latestQueryFormData: object;
+  latestQueryFormData: QueryFormData;
 }
 
-const ViewQueryModal: React.FC<Props> = props => {
-  const [language, setLanguage] = useState(null);
-  const [query, setQuery] = useState(null);
+type Result = {
+  query: string;
+  language: string;
+};
+
+const ViewQueryModalContainer = styled.div`
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.sizeUnit * 4}px;
+`;
+
+const ViewQueryModal: FC<Props> = ({ latestQueryFormData }) => {
+  const [result, setResult] = useState<Result[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadChartData = (resultType: string) => {
     setIsLoading(true);
     getChartDataRequest({
-      formData: props.latestQueryFormData,
+      formData: latestQueryFormData,
       resultFormat: 'json',
       resultType,
     })
       .then(({ json }) => {
-        // Only displaying the first query is currently supported
-        const result = json.result[0];
-        setLanguage(result.language);
-        setQuery(result.query);
+        setResult(ensureIsArray(json.result));
         setIsLoading(false);
         setError(null);
       })
@@ -80,7 +76,7 @@ const ViewQueryModal: React.FC<Props> = props => {
   };
   useEffect(() => {
     loadChartData('query');
-  }, [JSON.stringify(props.latestQueryFormData)]);
+  }, [JSON.stringify(latestQueryFormData)]);
 
   if (isLoading) {
     return <Loading />;
@@ -88,25 +84,21 @@ const ViewQueryModal: React.FC<Props> = props => {
   if (error) {
     return <pre>{error}</pre>;
   }
-  if (query) {
-    return (
-      <div>
-        <CopyToClipboard
-          text={query}
-          shouldShowText={false}
-          copyNode={
-            <CopyButtonViewQuery buttonSize="xsmall">
-              <i className="fa fa-clipboard" />
-            </CopyButtonViewQuery>
-          }
-        />
-        <SyntaxHighlighter language={language || undefined} style={github}>
-          {query}
-        </SyntaxHighlighter>
-      </div>
-    );
-  }
-  return null;
+
+  return (
+    <ViewQueryModalContainer>
+      {result.map((item, index) =>
+        item.query ? (
+          <ViewQuery
+            key={`query-${index}`}
+            datasource={latestQueryFormData.datasource}
+            sql={item.query}
+            language="sql"
+          />
+        ) : null,
+      )}
+    </ViewQueryModalContainer>
+  );
 };
 
 export default ViewQueryModal;

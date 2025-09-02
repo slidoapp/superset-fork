@@ -16,138 +16,120 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React, { useState } from 'react';
-import { withTheme, SupersetThemeProps } from '@superset-ui/core';
 import {
-  Select,
-  PaginatedSelect,
-  PartialThemeConfig,
-} from 'src/components/Select';
-import { Filter, SelectOption } from 'src/components/ListView/types';
-import { filterSelectStyles } from 'src/components/ListView/utils';
-import { FilterContainer, BaseFilter, FilterTitle } from './Base';
+  useState,
+  useMemo,
+  forwardRef,
+  useImperativeHandle,
+  type RefObject,
+} from 'react';
+
+import { t } from '@superset-ui/core';
+import { Select, AsyncSelect, FormLabel } from '@superset-ui/core/components';
+import { ListViewFilter as Filter, SelectOption } from '../types';
+import type { BaseFilter, FilterHandler } from './types';
+import { FilterContainer } from './Base';
+import { SELECT_WIDTH } from '../utils';
 
 interface SelectFilterProps extends BaseFilter {
-  emptyLabel?: string;
   fetchSelects?: Filter['fetchSelects'];
   name?: string;
-  onSelect: (selected: any) => any;
+  onSelect: (selected: SelectOption | undefined, isClear?: boolean) => void;
   paginate?: boolean;
   selects: Filter['selects'];
-  theme: SupersetThemeProps['theme'];
+  loading?: boolean;
+  dropdownStyle?: React.CSSProperties;
 }
 
-const CLEAR_SELECT_FILTER_VALUE = 'CLEAR_SELECT_FILTER_VALUE';
+function SelectFilter(
+  {
+    Header,
+    name,
+    fetchSelects,
+    initialValue,
+    onSelect,
+    selects = [],
+    loading = false,
+    dropdownStyle,
+  }: SelectFilterProps,
+  ref: RefObject<FilterHandler>,
+) {
+  const [selectedOption, setSelectedOption] = useState(initialValue);
 
-function SelectFilter({
-  Header,
-  emptyLabel = 'None',
-  fetchSelects,
-  initialValue,
-  onSelect,
-  paginate = false,
-  selects = [],
-  theme,
-}: SelectFilterProps) {
-  const filterSelectTheme: PartialThemeConfig = {
-    spacing: {
-      baseUnit: 2,
-      fontSize: theme.typography.sizes.s,
-      minWidth: '5em',
-    },
-  };
-
-  const clearFilterSelect = {
-    label: emptyLabel,
-    value: CLEAR_SELECT_FILTER_VALUE,
-  };
-
-  const options = [clearFilterSelect, ...selects];
-  let initialOption = clearFilterSelect;
-
-  // Set initial value if not async
-  if (!fetchSelects) {
-    const matchingOption = options.find(x => x.value === initialValue);
-
-    if (matchingOption) {
-      initialOption = matchingOption;
-    }
-  }
-
-  const [selectedOption, setSelectedOption] = useState(initialOption);
-  const onChange = (selected: SelectOption | null) => {
-    if (selected === null) return;
+  const onChange = (selected: SelectOption) => {
     onSelect(
-      selected.value === CLEAR_SELECT_FILTER_VALUE ? undefined : selected.value,
+      selected ? { label: selected.label, value: selected.value } : undefined,
     );
     setSelectedOption(selected);
   };
 
-  const fetchAndFormatSelects = async (
-    inputValue: string,
-    loadedOptions: SelectOption[],
-    { page }: { page: number },
-  ) => {
-    // only include clear filter when filter value does not exist
-    let result = inputValue || page > 0 ? [] : [clearFilterSelect];
-    let hasMore = paginate;
-    if (fetchSelects) {
-      const selectValues = await fetchSelects(inputValue, page);
-      // update matching option at initial load
-      if (!selectValues.length) {
-        hasMore = false;
-      }
-      result = [...result, ...selectValues];
-
-      const matchingOption = result.find(x => x.value === initialValue);
-
-      if (matchingOption) {
-        setSelectedOption(matchingOption);
-      }
-    }
-
-    return {
-      options: result,
-      hasMore,
-      additional: {
-        page: page + 1,
-      },
-    };
+  const onClear = () => {
+    onSelect(undefined, true);
+    setSelectedOption(undefined);
   };
 
+  useImperativeHandle(ref, () => ({
+    clearFilter: () => {
+      onClear();
+    },
+  }));
+
+  const fetchAndFormatSelects = useMemo(
+    () => async (inputValue: string, page: number, pageSize: number) => {
+      if (fetchSelects) {
+        const selectValues = await fetchSelects(inputValue, page, pageSize);
+        return {
+          data: selectValues.data,
+          totalCount: selectValues.totalCount,
+        };
+      }
+      return {
+        data: [],
+        totalCount: 0,
+      };
+    },
+    [fetchSelects],
+  );
+  const placeholder = t('Choose...');
   return (
-    <FilterContainer>
-      <FilterTitle>{Header}:</FilterTitle>
+    <FilterContainer
+      data-test="select-filter-container"
+      width={SELECT_WIDTH}
+      vertical
+      justify="center"
+      align="start"
+    >
+      <FormLabel>{Header}</FormLabel>
       {fetchSelects ? (
-        <PaginatedSelect
+        <AsyncSelect
+          allowClear
+          ariaLabel={typeof Header === 'string' ? Header : name || t('Filter')}
           data-test="filters-select"
-          defaultOptions
-          themeConfig={filterSelectTheme}
-          stylesConfig={filterSelectStyles}
-          // @ts-ignore
-          value={selectedOption}
-          // @ts-ignore
           onChange={onChange}
-          // @ts-ignore
-          loadOptions={fetchAndFormatSelects}
-          placeholder={emptyLabel}
-          clearable={false}
-          additional={{
-            page: 0,
-          }}
+          onClear={onClear}
+          options={fetchAndFormatSelects}
+          placeholder={placeholder}
+          dropdownStyle={dropdownStyle}
+          showSearch
+          value={selectedOption}
         />
       ) : (
         <Select
+          allowClear
+          ariaLabel={typeof Header === 'string' ? Header : name || t('Filter')}
           data-test="filters-select"
-          themeConfig={filterSelectTheme}
-          stylesConfig={filterSelectStyles}
-          value={selectedOption}
-          options={options}
+          labelInValue
           onChange={onChange}
-          clearable={false}
+          onClear={onClear}
+          options={selects}
+          placeholder={placeholder}
+          dropdownStyle={dropdownStyle}
+          showSearch
+          value={selectedOption}
+          loading={loading}
         />
       )}
     </FilterContainer>
   );
 }
-export default withTheme(SelectFilter);
+export default forwardRef(SelectFilter);

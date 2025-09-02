@@ -23,13 +23,14 @@ import {
   TimeGranularity,
   tn,
 } from '@superset-ui/core';
-import React, { useEffect, useMemo, useState } from 'react';
-import { Select } from 'src/common/components';
-import { FormItemProps } from 'antd/lib/form';
-import { Styles, StyledSelect, StyledFormItem, StatusMessage } from '../common';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  FormItem,
+  type FormItemProps,
+  Select,
+} from '@superset-ui/core/components';
+import { FilterPluginStyle, StatusMessage } from '../common';
 import { PluginFilterTimeGrainProps } from './types';
-
-const { Option } = Select;
 
 export default function PluginFilterTimegrain(
   props: PluginFilterTimeGrainProps,
@@ -40,11 +41,15 @@ export default function PluginFilterTimegrain(
     height,
     width,
     setDataMask,
+    setHoveredFilter,
+    unsetHoveredFilter,
     setFocusedFilter,
     unsetFocusedFilter,
+    setFilterActive,
     filterState,
+    inputRef,
   } = props;
-  const { defaultValue, inputRef } = formData;
+  const { defaultValue } = formData;
 
   const [value, setValue] = useState<string[]>(defaultValue ?? []);
   const durationMap = useMemo(
@@ -101,13 +106,22 @@ export default function PluginFilterTimegrain(
       </StatusMessage>
     );
   }
+
+  const options = (data || []).map(
+    (row: { name: string; duration: string }) => {
+      const { name, duration } = row;
+      return {
+        label: name,
+        value: duration,
+      };
+    },
+  );
+
   return (
-    <Styles height={height} width={width}>
-      <StyledFormItem
-        validateStatus={filterState.validateStatus}
-        {...formItemData}
-      >
-        <StyledSelect
+    <FilterPluginStyle height={height} width={width}>
+      <FormItem validateStatus={filterState.validateStatus} {...formItemData}>
+        <Select
+          name={formData.nativeFilterId}
           allowClear
           value={value}
           placeholder={placeholderText}
@@ -115,18 +129,14 @@ export default function PluginFilterTimegrain(
           onChange={handleChange}
           onBlur={unsetFocusedFilter}
           onFocus={setFocusedFilter}
+          onMouseEnter={setHoveredFilter}
+          onMouseLeave={unsetHoveredFilter}
           ref={inputRef}
-        >
-          {(data || []).map((row: { name: string; duration: string }) => {
-            const { name, duration } = row;
-            return (
-              <Option key={duration} value={duration}>
-                {name}
-              </Option>
-            );
-          })}
-        </StyledSelect>
-      </StyledFormItem>
-    </Styles>
+          options={options}
+          onOpenChange={setFilterActive}
+          sortComparator={() => 0} // Disable frontend sorting to preserve backend order
+        />
+      </FormItem>
+    </FilterPluginStyle>
   );
 }

@@ -17,14 +17,17 @@
  * under the License.
  */
 import { t, validateNonEmpty } from '@superset-ui/core';
-import { ControlPanelConfig, sections } from '@superset-ui/chart-controls';
-import { sharedControls } from '@superset-ui/chart-controls/lib';
+import {
+  ControlPanelConfig,
+  sharedControls,
+} from '@superset-ui/chart-controls';
 import { DEFAULT_FORM_DATA } from './types';
 
 const {
   enableEmptyFilter,
   inverseSelection,
   multiSelect,
+  creatable,
   defaultToFirstItem,
   searchAllOptions,
   sortAscending,
@@ -32,8 +35,6 @@ const {
 
 const config: ControlPanelConfig = {
   controlPanelSections: [
-    // @ts-ignore
-    sections.legacyRegularTime,
     {
       label: t('Query'),
       expanded: true,
@@ -43,7 +44,7 @@ const config: ControlPanelConfig = {
             name: 'groupby',
             config: {
               ...sharedControls.groupby,
-              label: 'Column',
+              label: t('Column'),
               required: true,
             },
           },
@@ -68,15 +69,26 @@ const config: ControlPanelConfig = {
         ],
         [
           {
+            name: 'creatable',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Allow creation of new values'),
+              default: creatable,
+              affectsDataMask: true,
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
             name: 'multiSelect',
             config: {
               type: 'CheckboxControl',
-              label: t('Multiple select'),
+              label: t('Can select multiple values'),
               default: multiSelect,
               resetConfig: true,
               affectsDataMask: true,
               renderTrigger: true,
-              description: t('Allow selecting multiple values'),
             },
           },
         ],
@@ -85,7 +97,7 @@ const config: ControlPanelConfig = {
             name: 'enableEmptyFilter',
             config: {
               type: 'CheckboxControl',
-              label: t('Required'),
+              label: t('Filter value is required'),
               default: enableEmptyFilter,
               renderTrigger: true,
               description: t(
@@ -99,14 +111,14 @@ const config: ControlPanelConfig = {
             name: 'defaultToFirstItem',
             config: {
               type: 'CheckboxControl',
-              label: t('Default to first item'),
+              label: t('Select first filter value by default'),
               default: defaultToFirstItem,
               resetConfig: true,
               affectsDataMask: true,
               renderTrigger: true,
               requiredFirst: true,
               description: t(
-                'Select first item by default (when using this option, default value can’t be set)',
+                'When using this option, default value can’t be set. Using this option may impact the load times for your dashboard.',
               ),
             },
           },
@@ -131,7 +143,7 @@ const config: ControlPanelConfig = {
               type: 'CheckboxControl',
               renderTrigger: true,
               affectsDataMask: true,
-              label: t('Search all filter options'),
+              label: t('Dynamically search all filter values'),
               default: searchAllOptions,
               description: t(
                 'By default, each filter loads at most 1000 choices at the initial page load. ' +

@@ -19,63 +19,60 @@
 
 /* eslint-disable no-param-reassign */
 // <- When we work with Immer, we need reassign, so disabling lint
-import produce from 'immer';
-import { DataMask, FeatureFlag } from '@superset-ui/core';
-import { NATIVE_FILTER_PREFIX } from 'src/dashboard/components/nativeFilters/FiltersConfigModal/utils';
-import { HYDRATE_DASHBOARD } from 'src/dashboard/actions/hydrate';
-import { isFeatureEnabled } from 'src/featureFlags';
-import { getUrlParam } from 'src/utils/urlUtils';
-import { URL_PARAMS } from 'src/constants';
-import { DataMaskStateWithId, DataMaskWithId } from './types';
+import { produce } from 'immer';
 import {
-  AnyDataMaskAction,
-  SET_DATA_MASK_FOR_FILTER_CONFIG_COMPLETE,
-  UPDATE_DATA_MASK,
-} from './actions';
-import {
+  DataMask,
+  DataMaskStateWithId,
+  DataMaskWithId,
   Filter,
   FilterConfiguration,
-} from '../dashboard/components/nativeFilters/types';
+  Filters,
+  FilterState,
+  ExtraFormData,
+} from '@superset-ui/core';
+import { NATIVE_FILTER_PREFIX } from 'src/dashboard/components/nativeFilters/FiltersConfigModal/utils';
+import { HYDRATE_DASHBOARD } from 'src/dashboard/actions/hydrate';
+import { SaveFilterChangesType } from 'src/dashboard/components/nativeFilters/FiltersConfigModal/types';
+import { isEqual } from 'lodash';
+import {
+  AnyDataMaskAction,
+  CLEAR_DATA_MASK_STATE,
+  SET_DATA_MASK_FOR_FILTER_CHANGES_COMPLETE,
+  UPDATE_DATA_MASK,
+} from './actions';
 import { areObjectsEqual } from '../reduxUtils';
-import { Filters } from '../dashboard/reducers/types';
+
+type FilterWithExtaFromData = Filter & {
+  extraFormData?: ExtraFormData;
+  filterState?: FilterState;
+};
 
 export function getInitialDataMask(
   id?: string | number,
-  moreProps?: DataMask,
-): DataMask;
-export function getInitialDataMask(
-  id: string | number,
   moreProps: DataMask = {},
-): DataMaskWithId {
-  let otherProps = {};
-  if (id) {
-    otherProps = {
-      id,
-    };
-  }
+): DataMask | DataMaskWithId {
   return {
-    ...otherProps,
+    ...(id !== undefined ? { id } : {}),
     extraFormData: {},
-    filterState: {
-      value: undefined,
-    },
+    filterState: {},
     ownState: {},
     ...moreProps,
-  } as DataMaskWithId;
+  } as DataMask | DataMaskWithId;
 }
 
 function fillNativeFilters(
   filterConfig: FilterConfiguration,
   mergedDataMask: DataMaskStateWithId,
   draftDataMask: DataMaskStateWithId,
+  initialDataMask?: DataMaskStateWithId,
   currentFilters?: Filters,
 ) {
-  const dataMaskFromUrl = getUrlParam(URL_PARAMS.nativeFilters) || {};
   filterConfig.forEach((filter: Filter) => {
+    const dataMask = initialDataMask || {};
     mergedDataMask[filter.id] = {
       ...getInitialDataMask(filter.id), // take initial data
       ...filter.defaultDataMask, // if something new came from BE - take it
-      ...dataMaskFromUrl[filter.id],
+      ...dataMask[filter.id],
     };
     if (
       currentFilters &&
@@ -100,10 +97,60 @@ function fillNativeFilters(
   });
 }
 
+function updateDataMaskForFilterChanges(
+  filterChanges: SaveFilterChangesType,
+  mergedDataMask: DataMaskStateWithId,
+  draftDataMask: DataMaskStateWithId,
+  initialDataMask?: Filters,
+) {
+  const dataMask = initialDataMask || {};
+
+  Object.entries(dataMask).forEach(([key, value]) => {
+    mergedDataMask[key] = { ...value, ...value.defaultDataMask };
+  });
+
+  filterChanges.deleted.forEach((filterId: string) => {
+    delete mergedDataMask[filterId];
+  });
+
+  filterChanges.modified.forEach((filter: Filter) => {
+    const existingFilter = draftDataMask[filter.id] as FilterWithExtaFromData;
+
+    // Check if targets are equal
+    const areTargetsEqual = isEqual(existingFilter?.targets, filter?.targets);
+
+    // Preserve state only if filter exists, has enableEmptyFilter=true and targets match
+    const shouldPreserveState =
+      existingFilter &&
+      areTargetsEqual &&
+      (filter.controlValues?.enableEmptyFilter ||
+        filter.controlValues?.defaultToFirstItem);
+
+    mergedDataMask[filter.id] = {
+      ...getInitialDataMask(filter.id),
+      ...filter.defaultDataMask,
+      ...filter,
+      // Preserve extraFormData and filterState if conditions match
+      ...(shouldPreserveState && {
+        extraFormData: existingFilter.extraFormData,
+        filterState: existingFilter.filterState,
+      }),
+    };
+  });
+
+  Object.values(draftDataMask).forEach(filter => {
+    if (!String(filter?.id).startsWith(NATIVE_FILTER_PREFIX)) {
+      mergedDataMask[filter?.id] = filter;
+    }
+  });
+}
+
 const dataMaskReducer = produce(
   (draft: DataMaskStateWithId, action: AnyDataMaskAction) => {
-    const cleanState = {};
+    const cleanState: DataMaskStateWithId = {};
     switch (action.type) {
+      case CLEAR_DATA_MASK_STATE:
+        return cleanState;
       case UPDATE_DATA_MASK:
         draft[action.filterId] = {
           ...getInitialDataMask(action.filterId),
@@ -114,33 +161,32 @@ const dataMaskReducer = produce(
       // TODO: update hydrate to .ts
       // @ts-ignore
       case HYDRATE_DASHBOARD:
-        if (isFeatureEnabled(FeatureFlag.DASHBOARD_CROSS_FILTERS)) {
-          Object.keys(
-            // @ts-ignore
-            action.data.dashboardInfo?.metadata?.chart_configuration,
-          ).forEach(id => {
-            cleanState[id] = {
-              ...getInitialDataMask(id), // take initial data
-            };
-          });
-        }
+        Object.keys(
+          // @ts-ignore
+          action.data.dashboardInfo?.metadata?.chart_configuration,
+        ).forEach(id => {
+          cleanState[id] = {
+            ...(getInitialDataMask(id) as DataMaskWithId), // take initial data
+          };
+        });
         fillNativeFilters(
           // @ts-ignore
           action.data.dashboardInfo?.metadata?.native_filter_configuration ??
             [],
           cleanState,
           draft,
+          // @ts-ignore
+          action.data.dataMask,
         );
         return cleanState;
-      case SET_DATA_MASK_FOR_FILTER_CONFIG_COMPLETE:
-        fillNativeFilters(
-          action.filterConfig ?? [],
+      case SET_DATA_MASK_FOR_FILTER_CHANGES_COMPLETE:
+        updateDataMaskForFilterChanges(
+          action.filterChanges,
           cleanState,
           draft,
           action.filters,
         );
         return cleanState;
-
       default:
         return draft;
     }

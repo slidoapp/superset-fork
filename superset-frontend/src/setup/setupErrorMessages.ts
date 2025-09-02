@@ -16,11 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import getErrorMessageComponentRegistry from 'src/components/ErrorMessage/getErrorMessageComponentRegistry';
-import { ErrorTypeEnum } from 'src/components/ErrorMessage/types';
-import TimeoutErrorMessage from 'src/components/ErrorMessage/TimeoutErrorMessage';
-import DatabaseErrorMessage from 'src/components/ErrorMessage/DatabaseErrorMessage';
-import ParameterErrorMessage from 'src/components/ErrorMessage/ParameterErrorMessage';
+import { ErrorTypeEnum } from '@superset-ui/core';
+import {
+  getErrorMessageComponentRegistry,
+  TimeoutErrorMessage,
+  DatabaseErrorMessage,
+  MarshmallowErrorMessage,
+  ParameterErrorMessage,
+  DatasetNotFoundErrorMessage,
+  InvalidSQLErrorMessage,
+  OAuth2RedirectMessage,
+  FrontendNetworkErrorMessage,
+} from 'src/components';
 
 import setupErrorMessagesExtra from './setupErrorMessagesExtra';
 
@@ -32,6 +39,10 @@ export default function setupErrorMessages() {
     TimeoutErrorMessage,
   );
   errorMessageComponentRegistry.registerValue(
+    ErrorTypeEnum.FRONTEND_NETWORK_ERROR,
+    FrontendNetworkErrorMessage,
+  );
+  errorMessageComponentRegistry.registerValue(
     ErrorTypeEnum.BACKEND_TIMEOUT_ERROR,
     TimeoutErrorMessage,
   );
@@ -41,6 +52,10 @@ export default function setupErrorMessages() {
   );
   errorMessageComponentRegistry.registerValue(
     ErrorTypeEnum.GENERIC_DB_ENGINE_ERROR,
+    DatabaseErrorMessage,
+  );
+  errorMessageComponentRegistry.registerValue(
+    ErrorTypeEnum.GENERIC_BACKEND_ERROR,
     DatabaseErrorMessage,
   );
   errorMessageComponentRegistry.registerValue(
@@ -133,6 +148,26 @@ export default function setupErrorMessages() {
   );
   errorMessageComponentRegistry.registerValue(
     ErrorTypeEnum.CONNECTION_DATABASE_PERMISSIONS_ERROR,
+    DatabaseErrorMessage,
+  );
+  errorMessageComponentRegistry.registerValue(
+    ErrorTypeEnum.FAILED_FETCHING_DATASOURCE_INFO_ERROR,
+    DatasetNotFoundErrorMessage,
+  );
+  errorMessageComponentRegistry.registerValue(
+    ErrorTypeEnum.MARSHMALLOW_ERROR,
+    MarshmallowErrorMessage,
+  );
+  errorMessageComponentRegistry.registerValue(
+    ErrorTypeEnum.OAUTH2_REDIRECT,
+    OAuth2RedirectMessage,
+  );
+  errorMessageComponentRegistry.registerValue(
+    ErrorTypeEnum.INVALID_SQL_ERROR,
+    InvalidSQLErrorMessage,
+  );
+  errorMessageComponentRegistry.registerValue(
+    ErrorTypeEnum.RESULT_TOO_LARGE_ERROR,
     DatabaseErrorMessage,
   );
   setupErrorMessagesExtra();

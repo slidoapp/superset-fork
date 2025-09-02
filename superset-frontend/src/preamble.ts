@@ -17,49 +17,83 @@
  * under the License.
  */
 import { setConfig as setHotLoaderConfig } from 'react-hot-loader';
-import 'abortcontroller-polyfill/dist/abortcontroller-polyfill-only';
-import moment from 'moment';
-import { configure, supersetTheme } from '@superset-ui/core';
-import { merge } from 'lodash';
+import dayjs from 'dayjs';
+// eslint-disable-next-line no-restricted-imports
+import {
+  configure,
+  makeApi,
+  initFeatureFlags,
+  SupersetClient,
+  LanguagePack,
+} from '@superset-ui/core';
 import setupClient from './setup/setupClient';
 import setupColors from './setup/setupColors';
 import setupFormatters from './setup/setupFormatters';
+import setupDashboardComponents from './setup/setupDashboardComponents';
+import { User } from './types/bootstrapTypes';
+import getBootstrapData, { applicationRoot } from './utils/getBootstrapData';
 
+configure();
+
+// Set hot reloader config
 if (process.env.WEBPACK_MODE === 'development') {
   setHotLoaderConfig({ logLevel: 'debug', trackTailUpdates: false });
 }
 
-let bootstrapData: any;
-// Configure translation
-if (typeof window !== 'undefined') {
-  const root = document.getElementById('app');
+// Grab initial bootstrap data
+const bootstrapData = getBootstrapData();
 
-  bootstrapData = root
-    ? JSON.parse(root.getAttribute('data-bootstrap') || '{}')
-    : {};
-  if (bootstrapData.common && bootstrapData.common.language_pack) {
-    const languagePack = bootstrapData.common.language_pack;
-    configure({ languagePack });
-    moment.locale(bootstrapData.common.locale);
-  } else {
-    configure();
+// Setup SupersetClient early so we can fetch language pack
+setupClient({ appRoot: applicationRoot() });
+
+// Load language pack before anything else
+(async () => {
+  const lang = bootstrapData.common.locale || 'en';
+  if (lang !== 'en') {
+    try {
+      // Second call to configure to set the language pack
+      const { json } = await SupersetClient.get({
+        endpoint: `/superset/language_pack/${lang}/`,
+      });
+      configure({ languagePack: json as LanguagePack });
+      dayjs.locale(lang);
+    } catch (err) {
+      console.warn(
+        'Failed to fetch language pack, falling back to default.',
+        err,
+      );
+      configure();
+      dayjs.locale('en');
+    }
   }
-} else {
-  configure();
-}
 
-// Setup SupersetClient
-setupClient();
+  // Continue with rest of setup
+  initFeatureFlags(bootstrapData.common.feature_flags);
 
-setupColors(
-  bootstrapData?.common?.extra_categorical_color_schemes,
-  bootstrapData?.common?.extra_sequential_color_schemes,
-);
+  setupColors(
+    bootstrapData.common.extra_categorical_color_schemes,
+    bootstrapData.common.extra_sequential_color_schemes,
+  );
 
-// Setup number formatters
-setupFormatters();
+  setupFormatters(
+    bootstrapData.common.d3_format,
+    bootstrapData.common.d3_time_format,
+  );
 
-export const theme = merge(
-  supersetTheme,
-  bootstrapData?.common?.theme_overrides ?? {},
-);
+  setupDashboardComponents();
+
+  const getMe = makeApi<void, User>({
+    method: 'GET',
+    endpoint: '/api/v1/me/',
+  });
+
+  if (bootstrapData.user?.isActive) {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        getMe().catch(() => {
+          // SupersetClient will redirect to login on 401
+        });
+      }
+    });
+  }
+})();
