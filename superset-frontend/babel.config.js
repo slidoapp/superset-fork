@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-const packageConfig = require('./package.json');
+const packageConfig = require('./package');
 
 module.exports = {
   sourceMaps: true,
@@ -36,17 +36,31 @@ module.exports = {
     ],
     [
       '@babel/preset-react',
-      { development: process.env.BABEL_ENV === 'development' },
+      {
+        development: process.env.BABEL_ENV === 'development',
+        runtime: 'automatic',
+      },
     ],
+    '@babel/preset-typescript',
   ],
   plugins: [
     'lodash',
     '@babel/plugin-syntax-dynamic-import',
-    ['@babel/plugin-proposal-class-properties', { loose: true }],
-    ['@babel/plugin-proposal-optional-chaining', { loose: true }],
-    ['@babel/plugin-proposal-private-methods', { loose: true }],
+    ['@babel/plugin-transform-class-properties', { loose: true }],
+    ['@babel/plugin-transform-optional-chaining', { loose: true }],
+    ['@babel/plugin-transform-private-methods', { loose: true }],
+    ['@babel/plugin-transform-nullish-coalescing-operator', { loose: true }],
     ['@babel/plugin-transform-runtime', { corejs: 3 }],
+    // only used in packages/superset-ui-core/src/chart/components/reactify.tsx
+    ['babel-plugin-typescript-to-proptypes', { loose: true }],
     'react-hot-loader/babel',
+    [
+      '@emotion/babel-plugin',
+      {
+        autoLabel: 'dev-only',
+        labelFormat: '[local]',
+      },
+    ],
   ],
   env: {
     // Setup a different config for tests as they run in node instead of a browser
@@ -59,17 +73,34 @@ module.exports = {
             corejs: 3,
             loose: true,
             shippedProposals: true,
-            modules: 'commonjs',
+            modules: 'auto',
             targets: { node: 'current' },
           },
         ],
-        ['@emotion/babel-preset-css-prop'],
+        [
+          '@babel/preset-react',
+          {
+            development: process.env.BABEL_ENV === 'development',
+            runtime: 'automatic',
+          },
+        ],
+        '@babel/preset-typescript',
       ],
-      plugins: ['babel-plugin-dynamic-import-node'],
+      plugins: [
+        'babel-plugin-dynamic-import-node',
+        '@babel/plugin-transform-modules-commonjs',
+      ],
     },
     // build instrumented code for testing code coverage with Cypress
     instrumented: {
-      plugins: ['istanbul'],
+      plugins: [
+        [
+          'istanbul',
+          {
+            exclude: ['plugins/**/*', 'packages/**/*'],
+          },
+        ],
+      ],
     },
     production: {
       plugins: [
@@ -81,5 +112,14 @@ module.exports = {
         ],
       ],
     },
+    testableProduction: {
+      plugins: [],
+    },
   },
+  overrides: [
+    {
+      test: './plugins/plugin-chart-handlebars/node_modules/just-handlebars-helpers/*',
+      sourceType: 'unambiguous',
+    },
+  ],
 };

@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React from 'react';
+import { Component } from 'react';
 import PropTypes from 'prop-types';
 import { SketchPicker } from 'react-color';
-import { getCategoricalSchemeRegistry } from '@superset-ui/core';
-import Popover from 'src/components/Popover';
+import { getCategoricalSchemeRegistry, styled, css } from '@superset-ui/core';
+import { Popover } from '@superset-ui/core/components';
 import ControlHeader from '../ControlHeader';
 
 const propTypes = {
@@ -42,29 +42,30 @@ const swatchCommon = {
   bottom: '0px',
 };
 
+const StyledSwatch = styled.div`
+  ${({ theme }) => `
+      width: 50px;
+      height: 20px;
+      position: relative;
+      padding: ${theme.sizeUnit}px;
+      borderRadius: ${theme.borderRadius}px;
+      display: inline-block;
+      cursor: pointer;
+    `}
+`;
+
 const styles = {
-  swatch: {
-    width: '50px',
-    height: '20px',
-    position: 'relative',
-    padding: '5px',
-    borderRadius: '1px',
-    display: 'inline-block',
-    cursor: 'pointer',
-    boxShadow:
-      'rgba(0, 0, 0, 0.15) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.25) 0px 0px 4px inset',
-  },
   color: {
     ...swatchCommon,
     borderRadius: '2px',
   },
-  checkboard: {
+  checkerboard: {
     ...swatchCommon,
     background:
       'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYGAQYcAP3uCTZhw1gGGYhAGBZIA/nYDCgBDAm9BGDWAAJyRCgLaBCAAgXwixzAS0pgAAAABJRU5ErkJggg==") left center',
   },
 };
-export default class ColorPickerControl extends React.Component {
+export default class ColorPickerControl extends Component {
   constructor(props) {
     super(props);
     this.onChange = this.onChange.bind(this);
@@ -77,10 +78,16 @@ export default class ColorPickerControl extends React.Component {
   renderPopover() {
     const presetColors = getCategoricalSchemeRegistry()
       .get()
-      .colors.filter((s, i) => i < 7);
+      .colors.filter((s, i) => i < 9);
     return (
       <div id="filter-popover" className="color-popover">
         <SketchPicker
+          css={css`
+            // We need to use important here as these are element level styles
+            padding: 0 !important;
+            box-shadow: none !important;
+          `}
+          width={235}
           color={this.props.value}
           onChange={this.onChange}
           presetColors={presetColors}
@@ -103,10 +110,10 @@ export default class ColorPickerControl extends React.Component {
           placement="right"
           content={this.renderPopover()}
         >
-          <div style={styles.swatch}>
-            <div style={styles.checkboard} />
+          <StyledSwatch>
+            <div style={styles.checkerboard} />
             <div style={colStyle} />
-          </div>
+          </StyledSwatch>
         </Popover>
       </div>
     );

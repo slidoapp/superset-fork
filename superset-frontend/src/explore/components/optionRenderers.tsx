@@ -17,7 +17,6 @@
  * under the License.
  */
 
-import React from 'react';
 import { styled } from '@superset-ui/core';
 import {
   MetricOption,
@@ -27,6 +26,7 @@ import {
 } from '@superset-ui/chart-controls';
 
 const OptionContainer = styled.div`
+  width: 100%;
   > span {
     display: flex;
     align-items: center;
@@ -38,15 +38,15 @@ const OptionContainer = styled.div`
     text-overflow: ellipsis;
     white-space: nowrap;
     & ~ i {
-      margin-left: ${({ theme }) => theme.gridUnit}px;
+      margin-left: ${({ theme }) => theme.sizeUnit}px;
     }
   }
   .type-label {
-    margin-right: ${({ theme }) => theme.gridUnit * 3}px;
-    width: ${({ theme }) => theme.gridUnit * 7}px;
+    margin-right: ${({ theme }) => theme.sizeUnit * 3}px;
+    width: ${({ theme }) => theme.sizeUnit * 7}px;
     display: inline-block;
     text-align: center;
-    font-weight: ${({ theme }) => theme.typography.weights.bold};
+    font-weight: ${({ theme }) => theme.fontWeightStrong};
   }
 `;
 

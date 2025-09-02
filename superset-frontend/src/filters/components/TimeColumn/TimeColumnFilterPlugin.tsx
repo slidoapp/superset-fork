@@ -23,13 +23,14 @@ import {
   t,
   tn,
 } from '@superset-ui/core';
-import React, { useEffect, useState } from 'react';
-import { Select } from 'src/common/components';
-import { FormItemProps } from 'antd/lib/form';
-import { Styles, StyledSelect, StyledFormItem, StatusMessage } from '../common';
+import { useEffect, useState } from 'react';
+import {
+  FormItem,
+  type FormItemProps,
+  Select,
+} from '@superset-ui/core/components';
+import { FilterPluginStyle, StatusMessage } from '../common';
 import { PluginFilterTimeColumnProps } from './types';
-
-const { Option } = Select;
 
 export default function PluginFilterTimeColumn(
   props: PluginFilterTimeColumnProps,
@@ -40,11 +41,15 @@ export default function PluginFilterTimeColumn(
     height,
     width,
     setDataMask,
+    setHoveredFilter,
+    unsetHoveredFilter,
     setFocusedFilter,
     unsetFocusedFilter,
+    setFilterActive,
     filterState,
+    inputRef,
   } = props;
-  const { defaultValue, inputRef } = formData;
+  const { defaultValue } = formData;
 
   const [value, setValue] = useState<string[]>(defaultValue ?? []);
 
@@ -75,7 +80,7 @@ export default function PluginFilterTimeColumn(
   }, [JSON.stringify(filterState.value)]);
 
   const timeColumns = (data || []).filter(
-    row => row.dtype === GenericDataType.TEMPORAL,
+    row => row.dtype === GenericDataType.Temporal,
   );
 
   const placeholderText =
@@ -91,13 +96,22 @@ export default function PluginFilterTimeColumn(
       </StatusMessage>
     );
   }
+
+  const options = timeColumns.map(
+    (row: { column_name: string; verbose_name: string | null }) => {
+      const { column_name: columnName, verbose_name: verboseName } = row;
+      return {
+        label: verboseName ?? columnName,
+        value: columnName,
+      };
+    },
+  );
+
   return (
-    <Styles height={height} width={width}>
-      <StyledFormItem
-        validateStatus={filterState.validateStatus}
-        {...formItemData}
-      >
-        <StyledSelect
+    <FilterPluginStyle height={height} width={width}>
+      <FormItem validateStatus={filterState.validateStatus} {...formItemData}>
+        <Select
+          name={formData.nativeFilterId}
           allowClear
           value={value}
           placeholder={placeholderText}
@@ -105,23 +119,13 @@ export default function PluginFilterTimeColumn(
           onChange={handleChange}
           onBlur={unsetFocusedFilter}
           onFocus={setFocusedFilter}
+          onMouseEnter={setHoveredFilter}
+          onMouseLeave={unsetHoveredFilter}
           ref={inputRef}
-        >
-          {timeColumns.map(
-            (row: { column_name: string; verbose_name: string | null }) => {
-              const {
-                column_name: columnName,
-                verbose_name: verboseName,
-              } = row;
-              return (
-                <Option key={columnName} value={columnName}>
-                  {verboseName ?? columnName}
-                </Option>
-              );
-            },
-          )}
-        </StyledSelect>
-      </StyledFormItem>
-    </Styles>
+          options={options}
+          onOpenChange={setFilterActive}
+        />
+      </FormItem>
+    </FilterPluginStyle>
   );
 }

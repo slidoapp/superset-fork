@@ -16,7 +16,4 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import '../stylesheets/superset.less';
-
-// Importing Antd under its own stylesheet to prevent unintentional theming.
-import '../stylesheets/antd/index.less';
+import 'src/public-path';

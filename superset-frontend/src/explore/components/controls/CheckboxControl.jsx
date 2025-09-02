@@ -16,10 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React from 'react';
+import { Component } from 'react';
 import PropTypes from 'prop-types';
+import { styled, css } from '@superset-ui/core';
+import { Checkbox } from '@superset-ui/core/components';
 import ControlHeader from '../ControlHeader';
-import Checkbox from '../../../components/Checkbox';
 
 const propTypes = {
   value: PropTypes.bool,
@@ -32,9 +33,18 @@ const defaultProps = {
   onChange: () => {},
 };
 
-const checkboxStyle = { paddingRight: '5px' };
+const CheckBoxControlWrapper = styled.div`
+  ${({ theme }) => css`
+    .ControlHeader label {
+      color: ${theme.colorText};
+    }
+    span:has(label) {
+      padding-right: ${theme.sizeUnit * 2}px;
+    }
+  `}
+`;
 
-export default class CheckboxControl extends React.Component {
+export default class CheckboxControl extends Component {
   onChange() {
     this.props.onChange(!this.props.value);
   }
@@ -43,7 +53,6 @@ export default class CheckboxControl extends React.Component {
     return (
       <Checkbox
         onChange={this.onChange.bind(this)}
-        style={checkboxStyle}
         checked={!!this.props.value}
       />
     );
@@ -52,11 +61,13 @@ export default class CheckboxControl extends React.Component {
   render() {
     if (this.props.label) {
       return (
-        <ControlHeader
-          {...this.props}
-          leftNode={this.renderCheckbox()}
-          onClick={this.onChange.bind(this)}
-        />
+        <CheckBoxControlWrapper>
+          <ControlHeader
+            {...this.props}
+            leftNode={this.renderCheckbox()}
+            onClick={this.onChange.bind(this)}
+          />
+        </CheckBoxControlWrapper>
       );
     }
     return this.renderCheckbox();

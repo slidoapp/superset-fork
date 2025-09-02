@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React from 'react';
-import { styled, t, useTheme } from '@superset-ui/core';
-import Icons from 'src/components/Icons';
+import { useCallback } from 'react';
+import { css, styled, t, useTheme } from '@superset-ui/core';
+import { Icons, InfoTooltip } from '@superset-ui/core/components';
 import {
   CaretContainer,
   CloseContainer,
@@ -26,41 +26,71 @@ import {
   Label,
 } from 'src/explore/components/controls/OptionControls';
 import { OptionProps } from 'src/explore/components/controls/DndColumnSelectControl/types';
-import { InfoTooltipWithTrigger } from '@superset-ui/chart-controls';
 
-const StyledInfoTooltipWithTrigger = styled(InfoTooltipWithTrigger)`
-  margin: 0 ${({ theme }) => theme.gridUnit}px;
+const StyledInfoTooltip = styled(InfoTooltip)`
+  margin: 0 ${({ theme }) => theme.sizeUnit}px;
 `;
 
-export default function Option(props: OptionProps) {
+export default function Option({
+  children,
+  index,
+  clickClose,
+  withCaret,
+  isExtra,
+  datasourceWarningMessage,
+  canDelete = true,
+}: OptionProps) {
   const theme = useTheme();
+  const onClickClose = useCallback(
+    e => {
+      e.stopPropagation();
+      clickClose(index);
+    },
+    [clickClose, index],
+  );
   return (
-    <OptionControlContainer
-      data-test="option-label"
-      withCaret={props.withCaret}
-    >
-      <CloseContainer
-        role="button"
-        data-test="remove-control-button"
-        onClick={() => props.clickClose(props.index)}
-      >
-        <Icons.XSmall iconColor={theme.colors.grayscale.light1} />
-      </CloseContainer>
-      <Label data-test="control-label">{props.children}</Label>
-      {props.isExtra && (
-        <StyledInfoTooltipWithTrigger
-          icon="exclamation-triangle"
+    <OptionControlContainer data-test="option-label" withCaret={withCaret}>
+      {canDelete && (
+        <CloseContainer
+          css={css`
+            text-align: center;
+          `}
+          role="button"
+          data-test="remove-control-button"
+          onClick={onClickClose}
+        >
+          <Icons.CloseOutlined
+            iconSize="m"
+            iconColor={theme.colors.grayscale.light1}
+            css={css`
+              vertical-align: sub;
+            `}
+          />
+        </CloseContainer>
+      )}
+      <Label data-test="control-label">{children}</Label>
+      {(!!datasourceWarningMessage || isExtra) && (
+        <StyledInfoTooltip
+          type="warning"
           placement="top"
-          bsStyle="warning"
-          tooltip={t(`
+          tooltip={
+            datasourceWarningMessage ||
+            t(`
                 This filter was inherited from the dashboard's context.
                 It won't be saved when saving the chart.
-              `)}
+              `)
+          }
         />
       )}
-      {props.withCaret && (
+      {withCaret && (
         <CaretContainer>
-          <Icons.CaretRight iconColor={theme.colors.grayscale.light1} />
+          <Icons.RightOutlined
+            iconSize="m"
+            css={css`
+              margin: ${theme.sizeUnit}px;
+            `}
+            iconColor={theme.colors.grayscale.light1}
+          />
         </CaretContainer>
       )}
     </OptionControlContainer>

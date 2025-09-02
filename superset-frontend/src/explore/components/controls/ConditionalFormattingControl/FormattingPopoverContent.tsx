@@ -16,17 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React, { useCallback, useMemo } from 'react';
-import { styled, t } from '@superset-ui/core';
-import { Form, FormItem } from 'src/components/Form';
-import { Select } from 'src/components';
-import { Col, InputNumber, Row } from 'src/common/components';
-import Button from 'src/components/Button';
+import { useState } from 'react';
+import { styled, SupersetTheme, t, useTheme } from '@superset-ui/core';
 import {
-  COMPARATOR,
-  ConditionalFormattingConfig,
-  MULTIPLE_VALUE_COMPARATORS,
-} from './types';
+  Comparator,
+  MultipleValueComparators,
+} from '@superset-ui/chart-controls';
+import {
+  Select,
+  Button,
+  Form,
+  FormItem,
+  InputNumber,
+  Col,
+  Row,
+  type FormProps,
+} from '@superset-ui/core/components';
+import { ConditionalFormattingConfig } from './types';
+
+// TODO: tangled redefinition that aligns with @superset-ui/plugin-chart-table
+// used to be imported but main app shouldn't depend on plugins...
+export enum ColorSchemeEnum {
+  'Green' = 'Green',
+  'Red' = 'Red',
+}
 
 const FullWidthInputNumber = styled(InputNumber)`
   width: 100%;
@@ -37,78 +50,173 @@ const JustifyEnd = styled.div`
   justify-content: flex-end;
 `;
 
-const colorSchemeOptions = [
-  { value: 'rgb(0,255,0)', label: t('green') },
-  { value: 'rgb(255,255,0)', label: t('yellow') },
-  { value: 'rgb(255,0,0)', label: t('red') },
+const colorSchemeOptions = (theme: SupersetTheme) => [
+  { value: theme.colorSuccessBg, label: t('success') },
+  { value: theme.colorWarningBg, label: t('alert') },
+  { value: theme.colorErrorBg, label: t('error') },
 ];
 
 const operatorOptions = [
-  { value: COMPARATOR.GREATER_THAN, label: '>' },
-  { value: COMPARATOR.LESS_THAN, label: '<' },
-  { value: COMPARATOR.GREATER_OR_EQUAL, label: '≥' },
-  { value: COMPARATOR.LESS_OR_EQUAL, label: '≤' },
-  { value: COMPARATOR.EQUAL, label: '=' },
-  { value: COMPARATOR.NOT_EQUAL, label: '≠' },
-  { value: COMPARATOR.BETWEEN, label: '< x <' },
-  { value: COMPARATOR.BETWEEN_OR_EQUAL, label: '≤ x ≤' },
-  { value: COMPARATOR.BETWEEN_OR_LEFT_EQUAL, label: '≤ x <' },
-  { value: COMPARATOR.BETWEEN_OR_RIGHT_EQUAL, label: '< x ≤' },
+  { value: Comparator.None, label: t('None') },
+  { value: Comparator.GreaterThan, label: '>' },
+  { value: Comparator.LessThan, label: '<' },
+  { value: Comparator.GreaterOrEqual, label: '≥' },
+  { value: Comparator.LessOrEqual, label: '≤' },
+  { value: Comparator.Equal, label: '=' },
+  { value: Comparator.NotEqual, label: '≠' },
+  { value: Comparator.Between, label: '< x <' },
+  { value: Comparator.BetweenOrEqual, label: '≤ x ≤' },
+  { value: Comparator.BetweenOrLeftEqual, label: '≤ x <' },
+  { value: Comparator.BetweenOrRightEqual, label: '< x ≤' },
 ];
+
+const targetValueValidator =
+  (
+    compare: (targetValue: number, compareValue: number) => boolean,
+    rejectMessage: string,
+  ) =>
+  (targetValue: number | string) =>
+  (_: any, compareValue: number | string) => {
+    if (
+      !targetValue ||
+      !compareValue ||
+      compare(Number(targetValue), Number(compareValue))
+    ) {
+      return Promise.resolve();
+    }
+    return Promise.reject(new Error(rejectMessage));
+  };
+
+const targetValueLeftValidator = targetValueValidator(
+  (target: number, val: number) => target > val,
+  t('This value should be smaller than the right target value'),
+);
+
+const targetValueRightValidator = targetValueValidator(
+  (target: number, val: number) => target < val,
+  t('This value should be greater than the left target value'),
+);
+
+const isOperatorMultiValue = (operator?: Comparator) =>
+  operator && MultipleValueComparators.includes(operator);
+
+const isOperatorNone = (operator?: Comparator) =>
+  !operator || operator === Comparator.None;
+
+const rulesRequired = [{ required: true, message: t('Required') }];
+
+type GetFieldValue = Pick<Required<FormProps>['form'], 'getFieldValue'>;
+const rulesTargetValueLeft = [
+  { required: true, message: t('Required') },
+  ({ getFieldValue }: GetFieldValue) => ({
+    validator: targetValueLeftValidator(getFieldValue('targetValueRight')),
+  }),
+];
+
+const rulesTargetValueRight = [
+  { required: true, message: t('Required') },
+  ({ getFieldValue }: GetFieldValue) => ({
+    validator: targetValueRightValidator(getFieldValue('targetValueLeft')),
+  }),
+];
+
+const targetValueLeftDeps = ['targetValueRight'];
+const targetValueRightDeps = ['targetValueLeft'];
+
+const shouldFormItemUpdate = (
+  prevValues: ConditionalFormattingConfig,
+  currentValues: ConditionalFormattingConfig,
+) =>
+  isOperatorNone(prevValues.operator) !==
+    isOperatorNone(currentValues.operator) ||
+  isOperatorMultiValue(prevValues.operator) !==
+    isOperatorMultiValue(currentValues.operator);
+
+const renderOperator = ({ showOnlyNone }: { showOnlyNone?: boolean } = {}) => (
+  <FormItem
+    name="operator"
+    label={t('Operator')}
+    rules={rulesRequired}
+    initialValue={operatorOptions[0].value}
+  >
+    <Select
+      ariaLabel={t('Operator')}
+      options={showOnlyNone ? [operatorOptions[0]] : operatorOptions}
+    />
+  </FormItem>
+);
+
+const renderOperatorFields = ({ getFieldValue }: GetFieldValue) =>
+  isOperatorNone(getFieldValue('operator')) ? (
+    <Row gutter={12}>
+      <Col span={6}>{renderOperator()}</Col>
+    </Row>
+  ) : isOperatorMultiValue(getFieldValue('operator')) ? (
+    <Row gutter={12}>
+      <Col span={9}>
+        <FormItem
+          name="targetValueLeft"
+          label={t('Left value')}
+          rules={rulesTargetValueLeft}
+          dependencies={targetValueLeftDeps}
+          validateTrigger="onBlur"
+          trigger="onBlur"
+        >
+          <FullWidthInputNumber />
+        </FormItem>
+      </Col>
+      <Col span={6}>{renderOperator()}</Col>
+      <Col span={9}>
+        <FormItem
+          name="targetValueRight"
+          label={t('Right value')}
+          rules={rulesTargetValueRight}
+          dependencies={targetValueRightDeps}
+          validateTrigger="onBlur"
+          trigger="onBlur"
+        >
+          <FullWidthInputNumber />
+        </FormItem>
+      </Col>
+    </Row>
+  ) : (
+    <Row gutter={12}>
+      <Col span={6}>{renderOperator()}</Col>
+      <Col span={18}>
+        <FormItem
+          name="targetValue"
+          label={t('Target value')}
+          rules={rulesRequired}
+        >
+          <FullWidthInputNumber />
+        </FormItem>
+      </Col>
+    </Row>
+  );
 
 export const FormattingPopoverContent = ({
   config,
   onChange,
   columns = [],
+  extraColorChoices = [],
 }: {
   config?: ConditionalFormattingConfig;
   onChange: (config: ConditionalFormattingConfig) => void;
   columns: { label: string; value: string }[];
+  extraColorChoices?: { label: string; value: string }[];
 }) => {
-  const isOperatorMultiValue = (operator?: COMPARATOR) =>
-    operator && MULTIPLE_VALUE_COMPARATORS.includes(operator);
-
-  const operatorField = useMemo(
-    () => (
-      <FormItem
-        name="operator"
-        label={t('Operator')}
-        rules={[{ required: true, message: t('Required') }]}
-        initialValue={operatorOptions[0].value}
-      >
-        <Select ariaLabel={t('Operator')} options={operatorOptions} />
-      </FormItem>
-    ),
-    [],
+  const theme = useTheme();
+  const colorScheme = colorSchemeOptions(theme);
+  const [showOperatorFields, setShowOperatorFields] = useState(
+    config === undefined ||
+      (config?.colorScheme !== ColorSchemeEnum.Green &&
+        config?.colorScheme !== ColorSchemeEnum.Red),
   );
-
-  const targetValueLeftValidator = useCallback(
-    (rightValue?: number) => (_: any, value?: number) => {
-      if (!value || !rightValue || rightValue > value) {
-        return Promise.resolve();
-      }
-      return Promise.reject(
-        new Error(
-          t('This value should be smaller than the right target value'),
-        ),
-      );
-    },
-    [],
-  );
-
-  const targetValueRightValidator = useCallback(
-    (leftValue?: number) => (_: any, value?: number) => {
-      if (!value || !leftValue || leftValue < value) {
-        return Promise.resolve();
-      }
-      return Promise.reject(
-        new Error(
-          t('This value should be smaller than the right target value'),
-        ),
-      );
-    },
-    [],
-  );
+  const handleChange = (event: any) => {
+    setShowOperatorFields(
+      !(event === ColorSchemeEnum.Green || event === ColorSchemeEnum.Red),
+    );
+  };
 
   return (
     <Form
@@ -122,7 +230,7 @@ export const FormattingPopoverContent = ({
           <FormItem
             name="column"
             label={t('Column')}
-            rules={[{ required: true, message: t('Required') }]}
+            rules={rulesRequired}
             initialValue={columns[0]?.value}
           >
             <Select ariaLabel={t('Select column')} options={columns} />
@@ -132,84 +240,25 @@ export const FormattingPopoverContent = ({
           <FormItem
             name="colorScheme"
             label={t('Color scheme')}
-            rules={[{ required: true, message: t('Required') }]}
-            initialValue={colorSchemeOptions[0].value}
+            rules={rulesRequired}
+            initialValue={colorScheme[0].value}
           >
             <Select
+              onChange={event => handleChange(event)}
               ariaLabel={t('Color scheme')}
-              options={colorSchemeOptions}
+              options={[...colorScheme, ...extraColorChoices]}
             />
           </FormItem>
         </Col>
       </Row>
-      <FormItem
-        noStyle
-        shouldUpdate={(
-          prevValues: ConditionalFormattingConfig,
-          currentValues: ConditionalFormattingConfig,
-        ) =>
-          isOperatorMultiValue(prevValues.operator) !==
-          isOperatorMultiValue(currentValues.operator)
-        }
-      >
-        {({ getFieldValue }) =>
-          isOperatorMultiValue(getFieldValue('operator')) ? (
-            <Row gutter={12}>
-              <Col span={9}>
-                <FormItem
-                  name="targetValueLeft"
-                  label={t('Left value')}
-                  rules={[
-                    { required: true, message: t('Required') },
-                    ({ getFieldValue }) => ({
-                      validator: targetValueLeftValidator(
-                        getFieldValue('targetValueRight'),
-                      ),
-                    }),
-                  ]}
-                  dependencies={['targetValueRight']}
-                  validateTrigger="onBlur"
-                  trigger="onBlur"
-                >
-                  <FullWidthInputNumber />
-                </FormItem>
-              </Col>
-              <Col span={6}>{operatorField}</Col>
-              <Col span={9}>
-                <FormItem
-                  name="targetValueRight"
-                  label={t('Right value')}
-                  rules={[
-                    { required: true, message: t('Required') },
-                    ({ getFieldValue }) => ({
-                      validator: targetValueRightValidator(
-                        getFieldValue('targetValueLeft'),
-                      ),
-                    }),
-                  ]}
-                  dependencies={['targetValueLeft']}
-                  validateTrigger="onBlur"
-                  trigger="onBlur"
-                >
-                  <FullWidthInputNumber />
-                </FormItem>
-              </Col>
-            </Row>
-          ) : (
-            <Row gutter={12}>
-              <Col span={6}>{operatorField}</Col>
-              <Col span={18}>
-                <FormItem
-                  name="targetValue"
-                  label={t('Target value')}
-                  rules={[{ required: true, message: t('Required') }]}
-                >
-                  <FullWidthInputNumber />
-                </FormItem>
-              </Col>
-            </Row>
-          )
-        }
+      <FormItem noStyle shouldUpdate={shouldFormItemUpdate}>
+        {showOperatorFields ? (
+          renderOperatorFields
+        ) : (
+          <Row gutter={12}>
+            <Col span={6}>{renderOperator({ showOnlyNone: true })}</Col>
+          </Row>
+        )}
       </FormItem>
       <FormItem>
         <JustifyEnd>

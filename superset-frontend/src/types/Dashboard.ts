@@ -19,12 +19,12 @@
 import Owner from './Owner';
 import Role from './Role';
 
-type Dashboard = {
+export interface Dashboard {
   id: number;
   slug?: string | null;
   url: string;
   dashboard_title: string;
-  thumbnail_url: string;
+  thumbnail_url: string | null;
   published: boolean;
   css?: string | null;
   json_metadata?: string | null;
@@ -35,6 +35,9 @@ type Dashboard = {
   charts: string[]; // just chart names, unfortunately...
   owners: Owner[];
   roles: Role[];
-};
-
-export default Dashboard;
+  theme?: {
+    id: number;
+    theme_name: string;
+    json_data: string;
+  } | null;
+}
